@@ -1,105 +1,109 @@
-# include <SDL/SDL.h>
-# include <SDL/SDL_image.h>
-# include <stdlib.h>
-# include <assert.h>
-# include <err.h>
-# include <stdio.h>
-# include <stdlib.h>
-# include <time.h>
-# include "pixel_operations.h"
+//
+//  main.c
+//  testsXOR
+//
+//  Created by yassir ramdani on 06/10/2017.
+//  Copyright © 2017 ramsserio. All rights reserved.
+//
 
-void wait_for_keypressed(void) {
-  SDL_Event             event;
-  // Infinite loop, waiting for event
-  for (;;) {
-    // Take an event
-    SDL_PollEvent( &event );
-    // Switch on event type
-    switch (event.type) {
-    // Someone pressed a key -> leave the function
-    case SDL_KEYDOWN: return;
-    default: break;
+#include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+#include <time.h>
+
+double sigmoid(double x){
+    return(1/(1 + exp(-x)));
+}
+
+int getActivatedOutput(int x1,int x2, int w1, int w2 , int b){
+    int z = w1*x1 + w2*x2 + b;
+    
+    if( z  >= 0){
+        return  1;
     }
-  // Loop until we got the expected event
-  }
+    
+    return 0;
 }
 
-void init_sdl(void) {
-  // Init only the video part
-  if( SDL_Init(SDL_INIT_VIDEO)==-1 ) {
-    // If it fails, die with an error message
-    errx(1,"Could not initialize SDL: %s.\n", SDL_GetError());
-  }
-  // We don't really need a function for that ...
-}
+void Learn(int nbrValues,int *X1, int *X2,int *GroundTruth,float* w1,float* w2,float* b){
+    
 
-SDL_Surface* load_image(char *path) {
-  SDL_Surface          *img;
-  // Load an image using SDL_image with format detection
-  img = IMG_Load(path);
-  if (!img)
-    // If it fails, die with an error message
-    errx(3, "can't load %s: %s", path, IMG_GetError());
-  return img;
-}
+    int y;
+    int lambda = 1;
+    int m ;
+    
+    
+    for(int p = 0 ; p<nbrValues ; p++){
+        
+        
+        int x1 = * (X1 +p);
+        int x2 = * (X2 +p);
+        int Groundtruth = *(GroundTruth+p);
+        
+        y = getActivatedOutput(x1 ,x2 ,*w1,*w2,*b);
 
-SDL_Surface* display_image(SDL_Surface *img) {
-  SDL_Surface          *screen;
-  // Set the window to the same size as the image
-  screen = SDL_SetVideoMode(img->w, img->h, 0, SDL_SWSURFACE|SDL_ANYFORMAT);
-  if ( screen == NULL ) {
-    // error management
-    errx(1, "Couldn't set %dx%d video mode: %s\n",
-         img->w, img->h, SDL_GetError());
-  }
+        int error = 0;
+        
+        for( m = 0 ; m <1000 ; m++){
+            error = 0;
+            y = getActivatedOutput(x1, x2,*w1,*w2,*b);
+            
+            error = Groundtruth - y;
+            
+            *w1 = *w1 + lambda*error*x1;
+            *w2 = *w2 + lambda*error*x2;
+            
+            *b = *b + lambda*error;
+        
+            
+        }
 
-  /* Blit onto the screen surface */
-  if(SDL_BlitSurface(img, NULL, screen, NULL) < 0)
-    warnx("BlitSurface error: %s\n", SDL_GetError());
-
-  // Update the screen
-  SDL_UpdateRect(screen, 0, 0, img->w, img->h);
-
-  // wait for a key
-  wait_for_keypressed();
-
-  // return the screen for further uses
-  return screen;
-}
-
-
-int main(){
-  init_sdl();
-  display_image(load_image("Rick-and-morty-season-1.jpg"));
-
-  SDL_Surface* SourceImg = load_image("Rick-and-morty-season-1.jpg");
-
-  unsigned int width = SourceImg->w;
-  unsigned int height = SourceImg->h;
-    for(unsigned int x =0; x <= width; x++){
-      for(unsigned int y = 0; y <= height; y++){
-	Uint8 r;
-	Uint8 g;
-	Uint8 b;
-
-
-	Uint32 p = getpixel(SourceImg, x, y);
-	SDL_GetRGB(p, SourceImg->format, &r, &g, &b);
-
-	r = (((float)r)*0.8);
-	g = (((float)r)*0.70);
-	b = (((float)r)*0.60);
-
-	float luminance = (r+g+b)/3;
-
-	r = (Uint8)luminance;
-
-	Uint32 P = SDL_MapRGB(SourceImg->format, r, r, r);
-
-	putpixel(SourceImg, x, y, P);
-	 }
-      }
-  display_image(SourceImg);
-
-  return 0;
     }
+    
+}
+
+
+
+int main (){
+
+    // Je donne des w et b en random :
+    float w1 = rand()%3 -1;
+    float w2 = rand()%3 -1;
+    float b  = rand()%3 -1;
+    
+    // le generateur de mimos XD hahah ca genere des random pour enseigner mon network
+    int x1[1000]           ;
+    int x2[1000]           ;
+    int Groundtruth[1000]  ;
+  
+
+    for(int i =0 ; i<1000 ; i++){
+        //1000 exemple generés auto par random
+        x1[i] = rand()%2;
+        x2[i] = rand()%2;
+        
+        //ici je choisis la loi que je veux appliquer
+        Groundtruth[i] = x1[i] && x2[i];
+    
+        printf("%d and %d = %d\n",x1[i],x2[i],Groundtruth[i]);
+    }
+    
+    
+    int len = sizeof(x1)/sizeof(x1[0]);
+    
+    // je Learn les exemples a mon neural network via notre fonction learn
+    Learn(len, x1, x2, Groundtruth, &w1, &w2, &b);
+    // Ca marche a tous les coups !
+    // grace aux 1000 exemples il apprend !
+    // c'est un bon eleve c'est juste qu'il lui faut bcp d'exemples !!
+    
+    printf("1 : 1 => %d  \n",getActivatedOutput(1, 1, w1, w2, b));
+    printf("0 : 1 => %d  \n",getActivatedOutput(0, 1, w1, w2, b));
+    printf("1 : 0 => %d  \n",getActivatedOutput(1, 0, w1, w2, b));
+    printf("0 : 0 => %d  \n",getActivatedOutput(0, 0, w1, w2, b));
+    printf("w1 : %f   /   w2 : %f   /   b : %f    \n", w1, w2, b);
+
+    
+    printf("\n\n\n\n\n");
+    return 0;
+}
